@@ -84,6 +84,8 @@ int constantVerify(const char* a, const char* b)
 
 int verifySafePrime(mpz_t p, int iter)
 {
+    int ret = 1;
+
     if(mpz_probab_prime_p(p,iter) == 0) {
         return 0;
     }
@@ -97,13 +99,13 @@ int verifySafePrime(mpz_t p, int iter)
     mpz_fdiv_q_ui(q,t,(gmpuint)2);
 
     if(mpz_probab_prime_p(q,iter) == 0) {
-        return 0;
+        ret = 0;
     }
 
     mpz_clear(q);
     mpz_clear(t);
 
-    return 1;
+    return ret;
 }
 
 void toErrIsHuman(const char* fileName, int lineNum, int errNo)
