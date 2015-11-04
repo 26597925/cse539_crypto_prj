@@ -5,9 +5,19 @@
 #include <stdio.h>
 #include <string.h>
 
+static int check_client_key_size(unsigned int minP, unsigned int iP, unsigned int maxP)
+{
+    int i = check_size(iP,1);
+    int m = check_size(minP,1);
+    int x = check_size(maxP,1);
+    return (i > 0) ? i : (x > 0) ? x : (m > 0) ? m : -1;
+}
+
 void dh_init(dhuser_t* this ,unsigned int minP, unsigned int iP, unsigned int maxP, unsigned int prvLen)
 {
-    if(check_size(iP) < 0)
+    int modSize = check_client_key_size(minP,iP,maxP);
+
+    if(modSize == -1)
         dh_error("Modulus size does not exist",__FILE__,__LINE__,1);
 
     this->values = calloc(9,sizeof(mpz_t));
@@ -17,7 +27,7 @@ void dh_init(dhuser_t* this ,unsigned int minP, unsigned int iP, unsigned int ma
     mpz_init_set_ui(this->values[MAX_MOD_LEN],(unsigned long int)maxP);
 
     if(generateParameters(this->values[PRIME_MODULUS],
-                this->values[GENERATOR],iP) < 0) {
+                this->values[GENERATOR],modSize) < 0) {
         dh_destroy(this);
         dh_error("Error generating parameters",__FILE__,__LINE__,1);
     }

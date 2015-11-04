@@ -6,13 +6,13 @@
 #include <unistd.h>
 #include <errno.h>
 
-int check_size(unsigned int b)
+int check_size(unsigned int b, int type)
 {
     static int lines[] = {1536,2048,3072,4096,6144,8192};
     static int l = 6;
     for(int i = 0; i < l; i++) {
         if(lines[i] == b)
-            return i;
+            return (type == 1) ? lines[i] : i;
     }
     return -1;
 }
@@ -34,7 +34,7 @@ int generateParameters(mpz_t p, mpz_t g, unsigned int n)
 {
     FILE *fp = NULL;
     
-    int l = check_size(n);
+    int l = check_size(n,0);
 
     if(l < 0) return -1;
 
