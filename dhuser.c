@@ -5,98 +5,84 @@
 #include <stdio.h>
 #include <string.h>
 
-dhuser* dh_init(size_t pklen)
+void dh_init(dhuser_t* this ,unsigned int minP, unsigned int iP, unsigned int maxP, unsigned int prvLen)
 {
-    dhuser* this = new(1,sizeof(dhuser));
+    if(check_size(iP) < 0)
+        dh_error("Modulus size does not exist",__FILE__,__LINE__,1);
 
-    if(!this) {
-        toErrIsHuman(__FILE__,__LINE__,errno);
-    }
+    this->values = calloc(9,sizeof(mpz_t));
 
-    mpz_init_set_str(this->primeModulus,
-            "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
-            "29024E088A67CC74020BBEA63B139B22514A08798E3404DD"
-            "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"
-            "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
-            "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3D"
-            "C2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F"
-            "83655D23DCA3AD961C62F356208552BB9ED529077096966D"
-            "670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B"
-            "E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9"
-            "DE2BCBF6955817183995497CEA956AE515D2261898FA0510"
-            "15728E5A8AAAC42DAD33170D04507A33A85521ABDF1CBA64"
-            "ECFB850458DBEF0A8AEA71575D060C7DB3970F85A6E1E4C7"
-            "ABF5AE8CDB0933D71E8C94E04A25619DCEE3D2261AD2EE6B"
-            "F12FFA06D98A0864D87602733EC86A64521F2B18177B200C"
-            "BBE117577A615D6C770988C0BAD946E208E24FA074E5AB31"
-            "43DB5BFCE0FD108E4B82D120A93AD2CAFFFFFFFFFFFFFFFF",
-            16);
-    
-    if(verifySafePrime(this->primeModulus,25) == 0) {
+    mpz_init_set_ui(this->values[MIN_MOD_LEN],(unsigned long int)minP);
+    mpz_init_set_ui(this->values[I_MOD_LEN],(unsigned long int)iP);
+    mpz_init_set_ui(this->values[MAX_MOD_LEN],(unsigned long int)maxP);
+
+    if(generateParameters(this->values[PRIME_MODULUS],
+                this->values[GENERATOR],iP) < 0) {
         dh_destroy(this);
-        toErrIsHuman(__FILE__,__LINE__,errno);
+        dh_error("Error generating parameters",__FILE__,__LINE__,1);
+    }
+ 
+    if(verifySafePrime(this->values[PRIME_MODULUS],25) == 0) {
+        dh_destroy(this);
+        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,1);
     }
 
-    mpz_init_set_str(this->generator,"2",16);
+    for(int i = SHARED; i <= SECRET; i++)
+        mpz_init(this->values[i]);
 
-    mpz_init(this->shared);
-
-    mpz_init(this->other);
-    
-    mpz_init(this->private);
-    
-    mpz_init(this->secret);
-
-    generateRandomValue(this->private,pklen);
-
-    return this;
+    if(generateRandomValue(this->values[PRIVATE],prvLen) < 0) {
+        dh_destroy(this);
+        dh_error("Error generating private key",__FILE__,__LINE__,1);
+    }
 }
 
-void dh_generateSharedKey(dhuser* this)
+void dh_generateSharedKey(dhuser_t* this)
 {
-    fastExponent(this->shared,this->generator,this->private,this->primeModulus);
+    fastExponent(this->values[SHARED],this->values[GENERATOR],
+            this->values[PRIVATE],this->values[PRIME_MODULUS]);
 }
 
-void dh_computeSecret(dhuser* this, mpz_t other)
+void dh_computeSecret(dhuser_t* this, mpz_t other)
 {
-    mpz_set(this->other,other);
-    fastExponent(this->secret,this->other,this->private,this->primeModulus);
+    mpz_set(this->values[OTHER],other);
+    fastExponent(this->values[SECRET],this->values[OTHER],
+            this->values[PRIVATE],this->values[PRIME_MODULUS]);
 }
 
-char* dh_computePublicHash(dhuser* this, int order)
+char* dh_computePublicHash(dhuser_t* this, int order)
 {
     if(order > 1) {
         dh_destroy(this);
-        toErrIsHuman(__FILE__,__LINE__,errno);
+        dh_error("Incorrect value",__FILE__,__LINE__,1);
     }
-    char* p = mpz_get_str(NULL,10,this->primeModulus);
-    char* g = mpz_get_str(NULL,10,this->generator);
+    char* min = mpz_get_str(NULL,10,this->values[MIN_MOD_LEN]);
+    char* ip = mpz_get_str(NULL,10,this->values[I_MOD_LEN]);
+    char* max = mpz_get_str(NULL,10,this->values[MAX_MOD_LEN]);
+    char* p = mpz_get_str(NULL,10,this->values[PRIME_MODULUS]);
+    char* g = mpz_get_str(NULL,10,this->values[GENERATOR]);
     char *e, *f;
     if(order == 0) {
-        e = mpz_get_str(NULL,10,this->other);
-        f = mpz_get_str(NULL,10,this->shared);
+        e = mpz_get_str(NULL,10,this->values[OTHER]);
+        f = mpz_get_str(NULL,10,this->values[SHARED]);
     } else {
-        f = mpz_get_str(NULL,10,this->other);
-        e = mpz_get_str(NULL,10,this->shared);
+        f = mpz_get_str(NULL,10,this->values[OTHER]);
+        e = mpz_get_str(NULL,10,this->values[SHARED]);
     }
-    char* k = mpz_get_str(NULL,10,this->secret);
-    if(!p || !g || !e || !f || !k) {
+    char* k = mpz_get_str(NULL,10,this->values[SECRET]);
+    if(!p || !g || !e || !f || !k || !min || !ip || !max) {
         dh_destroy(this);
-        toErrIsHuman(__FILE__,__LINE__,errno);
+        dh_error("Incorrect value",__FILE__,__LINE__,1);
     }
-    char concat[strlen(p)+strlen(g)+strlen(e)+strlen(f)+strlen(k)+1];
-    snprintf(concat,sizeof(concat),"%s%s%s%s%s",p,g,e,f,k);
-    delete(p);delete(g);delete(e);delete(f);delete(k);
+    char concat[strlen(min)+strlen(ip)+strlen(max)+strlen(p)+
+        strlen(g)+strlen(e)+strlen(f)+strlen(k)+1];
+    snprintf(concat,sizeof(concat),"%s%s%s%s%s%s%s%s",min,ip,max,p,g,e,f,k);
+    delete(min);delete(ip);delete(max);delete(p);delete(g);delete(e);delete(f);delete(k);
     return sha256(concat);
 }
 
-void dh_destroy(dhuser* this)
+void dh_destroy(dhuser_t* this)
 {
-    mpz_clear(this->primeModulus);
-    mpz_clear(this->generator);
-    mpz_clear(this->shared);
-    mpz_clear(this->other);
-    mpz_clear(this->private);
-    mpz_clear(this->secret);
-    delete(this);
+    for(int i = MIN_MOD_LEN; i <= PRIVATE; i++)
+        mpz_clear(this->values[i]);
+    delete(this->values);
 }

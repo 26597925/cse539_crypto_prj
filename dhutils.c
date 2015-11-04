@@ -6,12 +6,18 @@
 
 typedef unsigned long int gmpuint;
 
+void dh_error(const char* msg, const char* file, int line, int e)
+{
+    fprintf(stderr,"In %s:%d\n",file,line);
+    perror(msg);
+    if(e) exit(EXIT_FAILURE);
+}
+
 void* new(int num, size_t size)
 {
     void* v = calloc(num,size);
-    if(!v) {
-        toErrIsHuman(__FILE__,__LINE__,errno);
-    }
+    if(!v) 
+        dh_error(NULL,__FILE__,__LINE__,0);
     return v;
 }
 
@@ -108,9 +114,3 @@ int verifySafePrime(mpz_t p, int iter)
     return ret;
 }
 
-void toErrIsHuman(const char* fileName, int lineNum, int errNo)
-{
-    fprintf(stderr,"Error in file %s: %d\nFailed at line %d",fileName,errNo,lineNum);
-    fprintf(stderr,"\n%s\n",strerror(errNo));
-    exit(-1);
-}

@@ -1,90 +1,72 @@
 #include "dhutils.h"
 #include "dhuser.h"
+#include "dhsocket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
 #include <errno.h>
 
 int main(int argc, char* argv[])
 {
     if(argc < 2) {
-        toErrIsHuman(__FILE__,__LINE__,EINVAL);
+        dh_error("Usage: dhserver <port>",__FILE__,__LINE__,1);
     }
-
-    int sfd = 0, cfd = 0;
-
-    struct sockaddr_in serv_addr;
- 
-    if((sfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        toErrIsHuman(__FILE__,__LINE__,errno);
-    }
-
-    /*int enable = 1;
-    if(setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
-        toErrIsHuman(__FILE__,__LINE__,errno);*/
-
-    memset(&serv_addr,0,sizeof(serv_addr));
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(atoi(argv[1]));
-
-    bind(sfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-
-    if(listen(sfd,10) < 0) {
-        toErrIsHuman(__FILE__,__LINE__,errno);
-    }
-
-    cfd = accept(sfd, (struct sockaddr*)NULL, NULL);
     
-    dhuser* alice = dh_init(32);
+    dhsocket_t sock;
     
-    dh_generateSharedKey(alice);
+    if(dhsocket_init(&sock) == 0)
+        dh_error(NULL,__FILE__,__LINE__,1);
+    
+    printf("Socket connected\n");
 
-    size_t bs = mpz_sizeinbase(alice->shared, 16);
-    char buf[bs+1];
+    if(dhsocket_serv_start(&sock,atoi(argv[1])) == 0)
+        dh_error(NULL,__FILE__,__LINE__,1);
 
-    int  n = 0;
-    while(n < (int)bs) {
-        n = read(cfd, buf, bs);
-        if(n < 0) {
-            dh_destroy(alice);
-            toErrIsHuman(__FILE__,__LINE__,errno);
-        }
-    }
-    buf[bs] = '\0';
+    dhsocket_serv_accept(&sock);
 
-    mpz_t other;
-    mpz_init_set_str(other,buf,16);
+    if(sock.cfd >= 0) 
+        printf("Client connected on %d\n",sock.cfd);
 
-    dh_computeSecret(alice,other);
+    unsigned char buf[3*sizeof(unsigned int)+1];
+    dhsocket_recv(sock.cfd, buf, sizeof(buf)-1);
+    buf[sizeof(buf)] = '\0';
+    unsigned char minP[sizeof(unsigned int) + 1];
+    unsigned char iP[sizeof(unsigned int) + 1];
+    unsigned char maxP[sizeof(unsigned int) + 1];
+    sscanf((char*)buf,"%4s%4s%4s",minP,iP,maxP);
 
-    mpz_clear(other);
+    unsigned int uminP = atoi((char*)minP);
+    unsigned int uiP = atoi((char*)iP);
+    unsigned int umaxP = atoi((char*)maxP);
+    //printf("%u\n%u\n%u\n",uminP,uiP,umaxP);
 
-    char* hash = dh_computePublicHash(alice,0);
+    dhuser_t alice;
 
-    char* shared = mpz_get_str(NULL,16,alice->shared);
+    dh_init(&alice,uminP,uiP,umaxP,256);
 
-    write(cfd,shared,strlen(shared));
+    dh_generateSharedKey(&alice);
+   
+    unsigned int bs = mpz_sizeinbase(alice.values[SHARED], 16);
+    unsigned char other[bs+1];
+    dhsocket_recv(sock.cfd,other,bs);
+    other[bs] = '\0';
+    
+    mpz_t o;
+    mpz_init_set_str(o,(char*)other,16);
+    dh_computeSecret(&alice,o);
+    mpz_clear(o);
 
-    write(cfd,hash,strlen(hash));
+    char* shared = mpz_get_str(NULL,16,alice.values[SHARED]);
+    char* hash = dh_computePublicHash(&alice,0);
+    dhsocket_send(sock.cfd, shared, strlen(shared));
+    dhsocket_send(sock.cfd, hash, strlen(shared));
+    delete(shared);delete(hash);
 
-    delete(hash); delete(shared);
+    gmp_printf("Secret:\n%Zx\n",alice.values[SECRET]);
 
-    close(cfd);
+    dh_destroy(&alice);
 
-    close(sfd);
-
-    sleep(1);
-
-    gmp_printf("Secret: \n%Zx\n",alice->secret);
-
-    dh_destroy(alice);
+    dhsocket_close(&sock);
 
     return 0;
 }

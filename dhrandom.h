@@ -1,10 +1,10 @@
 #ifndef DH_RANDOM_H
 #define DH_RANDOM_H
 
-#include <stdlib.h>
 #include <gmp.h>
 
-void generatePrameters(mpz_t,mpz_t,size_t);
-void generateRandomValue(mpz_t,size_t);
+int     check_size(unsigned int);
+int     generateParameters(mpz_t,mpz_t,unsigned int);
+int     generateRandomValue(mpz_t,unsigned int);
 
 #endif

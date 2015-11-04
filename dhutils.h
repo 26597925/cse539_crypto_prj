@@ -11,6 +11,6 @@ char* sha256(const char*);
 void fastExponent(mpz_t,mpz_t,mpz_t,mpz_t);
 int constantVerify(const char*, const char*);
 int verifySafePrime(mpz_t,int);
-void toErrIsHuman(const char*,int,int);
+void dh_error(const char*,const char*,int,int);
 
 #endif
