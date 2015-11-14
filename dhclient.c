@@ -40,30 +40,35 @@ int main(int argc, char* argv[])
 
     dhsocket_send(sock.sfd,initBuf,strlen((char*)initBuf));
 
-    char res[9];
+    char res[5];
     dhsocket_recv(sock.sfd, (unsigned char*)res, sizeof(res)-1);
-    res[8] = '\0';
+    res[4] = '\0';
 
-    unsigned int  resP;
-    char res_msg[5];
-    sscanf(res,"%4s%u",res_msg,&resP);
-
-    if(constantVerify(res_msg,"Fail") == 1) {
-        dhsocket_close(&sock);
-        dh_error("No modulus of requested length",__FILE__,__LINE__,1);
-    } 
+    unsigned int  resP = atoi(res);
     
-    if(constantVerify(res_msg,"Succ") != 1) {
-        dhsocket_close(&sock);
-        dh_error("Unknown message recieved",__FILE__,__LINE__,1);
-    }
+    unsigned int mod_len = resP/8*2;
+    unsigned int gen_size = 1;
+    char modulus[mod_len+1];
+    char generator[gen_size+1];
+    char mod_gen_buf[mod_len+gen_size+1];
+    dhsocket_recv(sock.sfd, (unsigned char*)mod_gen_buf,sizeof(mod_gen_buf)-1);
+    mod_gen_buf[mod_len+gen_size] = '\0';
+    char ts[count(mod_len)+count(gen_size)+5];
+    snprintf(ts,sizeof(ts),"%%%ds%%%ds",mod_len,gen_size);
+    sscanf(mod_gen_buf,ts,modulus,generator);
 
     dhuser_t bob;
 
-    if(dh_init(&bob,minP,resP,maxP,CLIENT) < 0) {
+    if(dh_init(&bob, CLIENT) < 0) {
         dh_destroy(&bob);
         dhsocket_close(&sock);
         dh_error("Error creating dhuser",__FILE__,__LINE__,1);
+    }
+
+    if(dh_setParameters(&bob, minP, resP, maxP, modulus, generator) < 0) {
+        dh_destroy(&bob);
+        dhsocket_close(&sock);
+        dh_error("Error setting parameters",__FILE__,__LINE__,1);
     }
 
     if(dh_generatePrivateKey(&bob) < 0) {

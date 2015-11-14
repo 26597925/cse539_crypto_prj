@@ -23,7 +23,9 @@ struct dhuser
 };
 typedef struct dhuser dhuser_t;
 
-int             dh_init(dhuser_t*,unsigned int, unsigned int, unsigned int, int);
+int             dh_init(dhuser_t*, int);
+int             dh_generateParameters(dhuser_t*, unsigned int, unsigned int, unsigned int);
+int             dh_setParameters(dhuser_t*, unsigned int, unsigned int, unsigned int, const char*, const char*);
 int             dh_generatePrivateKey(dhuser_t*);
 void            dh_generateSharedKey(dhuser_t*);
 int             dh_computeSecret(dhuser_t*, mpz_t);

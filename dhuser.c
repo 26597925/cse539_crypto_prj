@@ -5,9 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int dh_init(dhuser_t* this , unsigned int minP, 
-        unsigned int aP, unsigned int maxP, 
-        int role)
+int dh_init(dhuser_t* this , int role)
 {
     if(role > 1)
         return -1;
@@ -17,25 +15,52 @@ int dh_init(dhuser_t* this , unsigned int minP,
     this->server_id = "Alice";
     this->client_id = "Bob";
 
-    this->min_mod_size = minP;
-    this->mod_size = aP;
-    this->max_mod_size = maxP;
-
-    if(generateParameters(this->P,this->G,aP) < 0) {
-        dh_error("Error generating parameters",__FILE__,__LINE__,0);
-        return -2;
-    }
- 
-    if(verifySafePrime(this->P,25) == 0) {
-        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,0);
-        return -3;
-    }
-
+    mpz_init(this->P);
+    mpz_init(this->G);
     mpz_init(this->X);
     mpz_init(this->Shared_E);
     mpz_init(this->Shared_F);
     mpz_init(this->K);
 
+    return 0;
+}
+
+int dh_generateParameters(dhuser_t* this, unsigned int minP, 
+        unsigned int aP, unsigned int maxP)
+{
+    this->min_mod_size = minP;
+    this->mod_size = aP;
+    this->max_mod_size = maxP;
+
+    if(generateParameters(this->P,this->G,this->mod_size) < 0) {
+        dh_error("Error generating parameters",__FILE__,__LINE__,0);
+        return -1;
+    }
+ 
+    if(verifySafePrime(this->P,25) == 0) {
+        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,0);
+        return -2;
+    }
+
+    return 0;
+}
+
+int dh_setParameters(dhuser_t* this, unsigned int minP,
+        unsigned int aP, unsigned int maxP,
+        const char* mod, const char* gen)
+{
+    this->min_mod_size = minP;
+    this->mod_size = aP;
+    this->max_mod_size = maxP;
+    
+    mpz_set_str(this->P,mod,16);
+    mpz_set_str(this->G,gen,16);
+    
+    if(verifySafePrime(this->P,25) == 0) {
+        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,0);
+        return -1;
+    }
+    
     return 0;
 }
 

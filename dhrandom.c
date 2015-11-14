@@ -10,11 +10,20 @@ int check_size(unsigned int b, int type)
 {
     static int lines[] = {1536,2048,3072,4096,6144,8192};
     static int l = 6;
+
+    int ret = -1;
     for(int i = 0; i < l; i++) {
-        if(lines[i] == b)
-            return (type == 1) ? lines[i] : i;
+        if(lines[i] == b) {
+            ret = (type == 0) ? lines[i] : i;
+            break;
+        } else {
+            if(lines[i] > b) {
+                ret = (type == 0) ? lines[i] : i;
+                break;
+            }
+        }
     }
-    return -1;
+    return (ret == -1) ? (type == 0) ? lines[l-1] : l-1  : ret;
 }
 
 static void skip_lines(FILE* f, int n)
@@ -34,9 +43,7 @@ int generateParameters(mpz_t p, mpz_t g, unsigned int n)
 {
     FILE *fp = NULL;
     
-    int l = check_size(n,0);
-
-    if(l < 0) return -1;
+    int l = check_size(n,1);
 
     fp = fopen("./moduli","r");
 

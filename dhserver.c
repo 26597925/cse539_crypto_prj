@@ -6,13 +6,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 
 static unsigned int check_client_key_size(unsigned int minP, unsigned int iP, unsigned int maxP)
 {
-    int i = check_size(iP,1);
-    int m = check_size(minP,1);
-    int x = check_size(maxP,1);
-    return (i > 0) ? iP : (x > 0) ? maxP : (m > 0) ? minP : -1;
+    int i = check_size(iP, 0);
+    int m = check_size(minP, 0);
+    int x = check_size(maxP, 0);
+    return (i > 0) ? i : (x > 0) ? x : (m > 0) ? m : -1;
+}
+
+static inline int count(int x)
+{
+    return floor(log10(x)) + 1;
 }
 
 int main(int argc, char* argv[])
@@ -48,25 +54,37 @@ int main(int argc, char* argv[])
     unsigned int uiP = atoi((char*)iP);
     unsigned int umaxP = atoi((char*)maxP);
 
-    unsigned int resP = check_client_key_size(uminP,uiP,umaxP);
-    if(resP == -1) {
-        char res[] = "Fail";
-        dhsocket_send(sock.cfd,(unsigned char*)res,strlen(res));
-        dhsocket_close(&sock);
-        dh_error("No modulus of requested length found",__FILE__,__LINE__,1);
-    }
-    char res[9];
-    snprintf(res,sizeof(res),"Succ%u",resP);
-    dhsocket_send(sock.cfd,(unsigned char*)res,strlen(res));
-
     dhuser_t alice;
 
-    if(dh_init(&alice,uminP,resP,umaxP,SERVER) < 0) {
+    if(dh_init(&alice, SERVER) < 0) {
         dh_destroy(&alice);
         dhsocket_close(&sock);
         dh_error("Error creating dhuser",__FILE__,__LINE__,1);
     }
+    
+    unsigned int resP = check_client_key_size(uminP,uiP,umaxP);
 
+    if(dh_generateParameters(&alice, uminP, resP, umaxP) < 0) {
+        dh_destroy(&alice);
+        dhsocket_close(&sock);
+        dh_error("Error generating parameters",__FILE__,__LINE__,1);
+    }
+
+    char res[5];
+    snprintf(res,sizeof(res),"%u",resP);
+    dhsocket_send(sock.cfd,res,strlen(res));
+    
+    char *modulus  = mpz_get_str(NULL,16,alice.P);
+    char *generator  = mpz_get_str(NULL,16,alice.G); 
+    unsigned int mod_len = strlen(modulus);
+    unsigned int gen_len = strlen(generator);
+    unsigned int len_send = mod_len+gen_len;
+    
+    char pconcatg[len_send+1];
+    snprintf(pconcatg,sizeof(pconcatg),"%s%s",modulus,generator);
+    dhsocket_send(sock.cfd,(unsigned char*)pconcatg,strlen(pconcatg));
+    delete(modulus);delete(generator);
+    
     if(dh_generatePrivateKey(&alice) < 0) {
         dh_destroy(&alice);
         dhsocket_close(&sock);
@@ -74,7 +92,7 @@ int main(int argc, char* argv[])
     }
 
     dh_generateSharedKey(&alice);
-   
+    
     unsigned int bs = mpz_sizeinbase(alice.Shared_F, 16);
     unsigned char other[bs+1];
     dhsocket_recv(sock.cfd,other,bs);
