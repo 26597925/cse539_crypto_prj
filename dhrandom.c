@@ -38,7 +38,7 @@ int generateParameters(mpz_t p, mpz_t g, unsigned int n)
 
     if(l < 0) return -1;
 
-    fp = fopen("../moduli","r");
+    fp = fopen("./moduli","r");
 
     if(fp == NULL) return -2;
 

@@ -5,94 +5,121 @@
 #include <stdio.h>
 #include <string.h>
 
-static int check_client_key_size(unsigned int minP, unsigned int iP, unsigned int maxP)
+int dh_init(dhuser_t* this , unsigned int minP, 
+        unsigned int aP, unsigned int maxP, 
+        int role)
 {
-    int i = check_size(iP,1);
-    int m = check_size(minP,1);
-    int x = check_size(maxP,1);
-    return (i > 0) ? i : (x > 0) ? x : (m > 0) ? m : -1;
-}
+    if(role > 1)
+        return -1;
 
-void dh_init(dhuser_t* this ,unsigned int minP, unsigned int iP, unsigned int maxP, unsigned int prvLen)
-{
-    int modSize = check_client_key_size(minP,iP,maxP);
+    this->role = role;
 
-    if(modSize == -1)
-        dh_error("Modulus size does not exist",__FILE__,__LINE__,1);
+    this->server_id = "Alice";
+    this->client_id = "Bob";
 
-    this->values = calloc(9,sizeof(mpz_t));
+    this->min_mod_size = minP;
+    this->mod_size = aP;
+    this->max_mod_size = maxP;
 
-    mpz_init_set_ui(this->values[MIN_MOD_LEN],(unsigned long int)minP);
-    mpz_init_set_ui(this->values[I_MOD_LEN],(unsigned long int)iP);
-    mpz_init_set_ui(this->values[MAX_MOD_LEN],(unsigned long int)maxP);
-
-    if(generateParameters(this->values[PRIME_MODULUS],
-                this->values[GENERATOR],modSize) < 0) {
-        dh_destroy(this);
-        dh_error("Error generating parameters",__FILE__,__LINE__,1);
+    if(generateParameters(this->P,this->G,aP) < 0) {
+        dh_error("Error generating parameters",__FILE__,__LINE__,0);
+        return -2;
     }
  
-    if(verifySafePrime(this->values[PRIME_MODULUS],25) == 0) {
-        dh_destroy(this);
-        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,1);
+    if(verifySafePrime(this->P,25) == 0) {
+        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,0);
+        return -3;
     }
 
-    for(int i = SHARED; i <= SECRET; i++)
-        mpz_init(this->values[i]);
+    mpz_init(this->X);
+    mpz_init(this->Shared_E);
+    mpz_init(this->Shared_F);
+    mpz_init(this->K);
 
-    if(generateRandomValue(this->values[PRIVATE],prvLen) < 0) {
-        dh_destroy(this);
-        dh_error("Error generating private key",__FILE__,__LINE__,1);
+    return 0;
+}
+
+int dh_generatePrivateKey(dhuser_t* this)
+{
+    static int modsizes[] = {1536,2048,3072,4096,6144,8192};
+    static int prv_key_lens[] = {240,320,420,480,540,620};
+    static int len = 6;
+
+    int v = -1;
+    for(int i = 0; i < len; i++) {
+        if(modsizes[i] == this->mod_size)
+            v = i;
     }
+
+    if(v == -1)
+        return -1;
+
+    if(generateRandomValue(this->X,prv_key_lens[v]) < 0) {
+        dh_error("Error generating private key",__FILE__,__LINE__,0);
+        return -2;
+    }
+
+    return 0;
 }
 
 void dh_generateSharedKey(dhuser_t* this)
 {
-    fastExponent(this->values[SHARED],this->values[GENERATOR],
-            this->values[PRIVATE],this->values[PRIME_MODULUS]);
-}
-
-void dh_computeSecret(dhuser_t* this, mpz_t other)
-{
-    mpz_set(this->values[OTHER],other);
-    fastExponent(this->values[SECRET],this->values[OTHER],
-            this->values[PRIVATE],this->values[PRIME_MODULUS]);
-}
-
-char* dh_computePublicHash(dhuser_t* this, int order)
-{
-    if(order > 1) {
-        dh_destroy(this);
-        dh_error("Incorrect value",__FILE__,__LINE__,1);
-    }
-    char* min = mpz_get_str(NULL,10,this->values[MIN_MOD_LEN]);
-    char* ip = mpz_get_str(NULL,10,this->values[I_MOD_LEN]);
-    char* max = mpz_get_str(NULL,10,this->values[MAX_MOD_LEN]);
-    char* p = mpz_get_str(NULL,10,this->values[PRIME_MODULUS]);
-    char* g = mpz_get_str(NULL,10,this->values[GENERATOR]);
-    char *e, *f;
-    if(order == 0) {
-        e = mpz_get_str(NULL,10,this->values[OTHER]);
-        f = mpz_get_str(NULL,10,this->values[SHARED]);
+    if(this->role == 0) {
+        fastExponent(this->Shared_F,this->G,this->X,this->P);
     } else {
-        f = mpz_get_str(NULL,10,this->values[OTHER]);
-        e = mpz_get_str(NULL,10,this->values[SHARED]);
+        fastExponent(this->Shared_E,this->G,this->X,this->P);
     }
-    char* k = mpz_get_str(NULL,10,this->values[SECRET]);
-    if(!p || !g || !e || !f || !k || !min || !ip || !max) {
-        dh_destroy(this);
-        dh_error("Incorrect value",__FILE__,__LINE__,1);
+}
+
+int dh_computeSecret(dhuser_t* this, mpz_t other)
+{
+    if(mpz_sizeinbase(other,16) > mpz_sizeinbase(this->P,16))
+        return -1;
+
+    if(this->role == 0) {
+        mpz_set(this->Shared_E,other);
+        fastExponent(this->K,this->Shared_E,this->X,this->P);
+    } else {
+        mpz_set(this->Shared_F,other);
+        fastExponent(this->K,this->Shared_F,this->X,this->P);
     }
-    char concat[strlen(min)+strlen(ip)+strlen(max)+strlen(p)+
-        strlen(g)+strlen(e)+strlen(f)+strlen(k)+1];
-    snprintf(concat,sizeof(concat),"%s%s%s%s%s%s%s%s",min,ip,max,p,g,e,f,k);
-    delete(min);delete(ip);delete(max);delete(p);delete(g);delete(e);delete(f);delete(k);
-    return sha256(concat);
+
+    return 0;
+}
+
+char* dh_computePublicHash(dhuser_t* this)
+{
+    char min[5], ap[5], max[5];
+    snprintf(min,5,"%u",this->min_mod_size);
+    snprintf(ap,5,"%u",this->mod_size);
+    snprintf(max,5,"%u",this->max_mod_size);
+
+    char* p = mpz_get_str(NULL,10,this->P);
+    char* g = mpz_get_str(NULL,10,this->G);
+    char* f = mpz_get_str(NULL,10,this->Shared_F);
+    char* e = mpz_get_str(NULL,10,this->Shared_E);
+    char* k = mpz_get_str(NULL,10,this->K);
+
+    if(!p || !g || !e || !f || !k) {
+        dh_error("Incorrect value",__FILE__,__LINE__,0);
+        return NULL;
+    }
+
+    size_t concat_len = strlen(min)+strlen(ap)+strlen(max)+strlen(p)+
+                        strlen(g)+strlen(e)+strlen(f)+strlen(k)+
+                        strlen(this->server_id)+strlen(this->client_id);
+    char concat[concat_len+1];
+    snprintf(concat,sizeof(concat),"%s%s%s%s%s%s%s%s%s%s",this->client_id,this->server_id,min,ap,max,p,g,e,f,k);
+    delete(p);delete(g);delete(e);delete(f);delete(k);
+    return hash(concat);
 }
 
 void dh_destroy(dhuser_t* this)
 {
-    for(int i = MIN_MOD_LEN; i <= PRIVATE; i++)
-        mpz_clear(this->values[i]);
-    delete(this->values);
+    mpz_clear(this->P);
+    mpz_clear(this->G);
+    mpz_clear(this->X);
+    mpz_clear(this->Shared_E);
+    mpz_clear(this->Shared_F);
+    mpz_clear(this->K);
 }

@@ -39,14 +39,14 @@ char* bytesToHex(unsigned char* bytes, size_t len)
     return ret;
 }
 
-char* sha256(const char* msg)
+char* hash(const char* msg)
 {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx,msg,strlen(msg));
-    SHA256_Final(hash,&ctx);
-    return bytesToHex(hash,sizeof(hash));
+    unsigned char h[SHA_DIGEST_LENGTH];
+    SHA_CTX ctx;
+    SHA1_Init(&ctx);
+    SHA1_Update(&ctx,msg,strlen(msg));
+    SHA1_Final(h,&ctx);
+    return bytesToHex(h,sizeof(h));
 }
 
 void fastExponent(mpz_t r, mpz_t a, mpz_t n ,mpz_t m)

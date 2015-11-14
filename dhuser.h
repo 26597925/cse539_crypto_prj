@@ -3,26 +3,31 @@
 
 #include <gmp.h>
 
-#define MIN_MOD_LEN 0
-#define I_MOD_LEN 1
-#define MAX_MOD_LEN 2
-#define PRIME_MODULUS 3
-#define GENERATOR 4
-#define SHARED 5
-#define OTHER 6 
-#define SECRET 7
-#define PRIVATE 8
+#define SERVER 0
+#define CLIENT 1
 
 struct dhuser
 {
-    mpz_t* values;
+    int role;
+    const char* server_id;
+    const char* client_id;
+    unsigned int min_mod_size;
+    unsigned int mod_size;
+    unsigned int max_mod_size;
+    mpz_t P;
+    mpz_t G;
+    mpz_t X;
+    mpz_t Shared_E;
+    mpz_t Shared_F;
+    mpz_t K;
 };
 typedef struct dhuser dhuser_t;
 
-void    dh_init(dhuser_t*,unsigned int, unsigned int, unsigned int, unsigned int);
-void    dh_generateSharedKey(dhuser_t*);
-void    dh_computeSecret(dhuser_t*, mpz_t);
-char*   dh_computePublicHash(dhuser_t*,int);
-void    dh_destroy(dhuser_t*);
+int             dh_init(dhuser_t*,unsigned int, unsigned int, unsigned int, int);
+int             dh_generatePrivateKey(dhuser_t*);
+void            dh_generateSharedKey(dhuser_t*);
+int             dh_computeSecret(dhuser_t*, mpz_t);
+char*           dh_computePublicHash(dhuser_t*);
+void            dh_destroy(dhuser_t*);
 
 #endif
