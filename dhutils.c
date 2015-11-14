@@ -42,10 +42,11 @@ char* bytesToHex(unsigned char* bytes, size_t len)
 char* hash(const char* msg)
 {
     unsigned char h[SHA_DIGEST_LENGTH];
-    SHA_CTX ctx;
+    /*SHA_CTX ctx;
     SHA1_Init(&ctx);
     SHA1_Update(&ctx,msg,strlen(msg));
-    SHA1_Final(h,&ctx);
+    SHA1_Final(h,&ctx);*/
+    SHA1((unsigned char*)msg, strlen(msg), h);
     return bytesToHex(h,sizeof(h));
 }
 

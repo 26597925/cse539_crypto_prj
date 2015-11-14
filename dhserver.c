@@ -55,8 +55,8 @@ int main(int argc, char* argv[])
         dhsocket_close(&sock);
         dh_error("No modulus of requested length found",__FILE__,__LINE__,1);
     }
-    char res[5];
-    snprintf(res,5,"%u",resP);
+    char res[9];
+    snprintf(res,sizeof(res),"Succ%u",resP);
     dhsocket_send(sock.cfd,(unsigned char*)res,strlen(res));
 
     dhuser_t alice;
@@ -91,11 +91,22 @@ int main(int argc, char* argv[])
 
     char* shared = mpz_get_str(NULL,16,alice.Shared_F);
     char* hash = dh_computePublicHash(&alice);
-    dhsocket_send(sock.cfd, shared, strlen(shared));
-    dhsocket_send(sock.cfd, hash, strlen(hash));
+    char to_send[strlen(shared)+strlen(hash) + 1];
+    snprintf(to_send,sizeof(to_send),"%s%s",shared,hash);
+    dhsocket_send(sock.cfd, to_send, strlen(to_send));
     delete(shared);delete(hash);
+ 
+    char final_rec[5];
+    dhsocket_recv(sock.cfd, (unsigned char*)final_rec, sizeof(final_rec) - 1);
+    final_rec[4] = '\0';
 
-    gmp_printf("Secret:\n%Zx\n",alice.K);
+    if(constantVerify(final_rec, "Fail") == 1) {
+        dh_error("Secret sharing failed",__FILE__,__LINE__,0);
+    } else if(constantVerify(final_rec, "Succ") == 1) {
+        printf("Secret sharing succeeded\n");
+    } else {
+        dh_error("Unknown msg recevied",__FILE__,__LINE__,0);
+    }
 
     dh_destroy(&alice);
 

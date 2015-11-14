@@ -40,18 +40,27 @@ int main(int argc, char* argv[])
 
     dhsocket_send(sock.sfd,initBuf,strlen((char*)initBuf));
 
-    char res[5];
+    char res[9];
     dhsocket_recv(sock.sfd, (unsigned char*)res, sizeof(res)-1);
-    res[4] = '\0';
+    res[8] = '\0';
 
-    if(constantVerify(res,"Fail") == 1) {
+    unsigned int  resP;
+    char res_msg[5];
+    sscanf(res,"%4s%u",res_msg,&resP);
+
+    if(constantVerify(res_msg,"Fail") == 1) {
         dhsocket_close(&sock);
         dh_error("No modulus of requested length",__FILE__,__LINE__,1);
+    } 
+    
+    if(constantVerify(res_msg,"Succ") != 1) {
+        dhsocket_close(&sock);
+        dh_error("Unknown message recieved",__FILE__,__LINE__,1);
     }
 
     dhuser_t bob;
 
-    if(dh_init(&bob,minP,atoi(res),maxP,CLIENT) < 0) {
+    if(dh_init(&bob,minP,resP,maxP,CLIENT) < 0) {
         dh_destroy(&bob);
         dhsocket_close(&sock);
         dh_error("Error creating dhuser",__FILE__,__LINE__,1);
@@ -81,8 +90,7 @@ int main(int argc, char* argv[])
     char typespec[count(bs)+count(hs)+5];
     snprintf(typespec,sizeof(typespec),"%%%zds%%%zds",bs,hs);
     sscanf((char*)buf,typespec,other,ohash);
-
-
+    
     mpz_t o;
     mpz_init_set_str(o,other,16);
     if(dh_computeSecret(&bob,o) < 0) {
@@ -93,11 +101,16 @@ int main(int argc, char* argv[])
     mpz_clear(o);
 
     char* hash = dh_computePublicHash(&bob);
- 
-    if(constantVerify(hash,ohash) == 0)
+    if(constantVerify(hash,ohash) == 0) {
+        char sec_msg[] = "Fail";
+        dhsocket_send(sock.sfd, (unsigned char*)sec_msg, strlen(sec_msg));
         dh_error("Authentication Failed",__FILE__,__LINE__,0);
-    else
-        gmp_printf("Secret:\n%Zx\n",bob.K);
+    } else {
+        char sec_msg[] = "Succ";
+        dhsocket_send(sock.sfd, (unsigned char*)sec_msg, strlen(sec_msg));
+        printf("Secret sharing succeeded\n");
+    }
+    delete(hash);
 
     dh_destroy(&bob);
 
