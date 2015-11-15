@@ -12,23 +12,22 @@ typedef unsigned long int gmpuint;
 
 void dh_error(const char* msg, const char* file, int line, int e)
 {
-    fprintf(stderr,"In %s:%d\n",file,line);
-    perror(msg);
+    //fprintf(stderr,"In %s:%d\n",file,line);
+    //perror(msg);
+    fputs("ERROR", stderr);
     if(e) exit(EXIT_FAILURE);
 }
 
 void* new(int num, size_t size)
 {
     void* v = calloc(num,size);
-    if(!v) 
-        dh_error(NULL,__FILE__,__LINE__,0);
     return v;
 }
 
-void delete(void* v)
+void delete(void** v)
 {
-    free(v);
-    v = NULL;
+    free(*v);
+    *v = NULL;
 }
 
 char* hash(const char* msg)
@@ -41,45 +40,48 @@ char* hash(const char* msg)
 void sign(const char* msg, unsigned char* sig_buf, unsigned int* sig_len)
 {
     EVP_MD_CTX md;
-    EVP_PKEY *pkey;
-    FILE* fp;
+    EVP_PKEY *pkey = NULL;
+    FILE* fp = NULL;
 
     fp = fopen("private_key.pem","r");
     if(!fp)
-        return;
+        goto err;
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
-    fclose(fp);
 
     if(!pkey) 
-        return;
+        goto err;
 
     EVP_SignInit(&md, EVP_sha1());
     EVP_SignUpdate(&md, msg, strlen(msg));
     if(EVP_SignFinal(&md, sig_buf, sig_len, pkey) != 1)
-        return;
-    
-    EVP_PKEY_free(pkey);
+        goto err; 
+
+err:
+    if(fp) fclose(fp);
+    if(pkey) EVP_PKEY_free(pkey);
 }
 
 int verify(const char* msg, unsigned char* sig_buf, unsigned int sig_len)
 {
     EVP_MD_CTX md;
-    EVP_PKEY *pkey;
-    FILE* fp;
+    EVP_PKEY *pkey = NULL;
+    FILE* fp = NULL;
+    int verified = 0;
  
     fp = fopen("public_key.pem","r");
     if(!fp)
-        return -1;
+        goto err;
     pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
-    fclose(fp);
     
     EVP_VerifyInit(&md, EVP_sha1());
     EVP_VerifyUpdate(&md, msg, strlen((char*)msg));
-    if(EVP_VerifyFinal(&md, sig_buf, sig_len, pkey) != 1)
-        return 0;
-    EVP_PKEY_free(pkey);
+    verified = (EVP_VerifyFinal(&md, sig_buf, sig_len, pkey) == 1);
 
-    return 1;
+err:
+    if(fp) fclose(fp);
+    if(pkey) EVP_PKEY_free(pkey);
+
+    return verified;
 }
 
 

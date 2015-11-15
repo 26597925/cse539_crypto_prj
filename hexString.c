@@ -60,6 +60,6 @@ char
 		retval[i*2] = nibbleToChar(bytes[i] >> 4);
 		retval[i*2+1] = nibbleToChar(bytes[i] & 0x0f);
 	}
-    retval[i] = '\0';
+    retval[2*i] = '\0';
 	return retval;
 }

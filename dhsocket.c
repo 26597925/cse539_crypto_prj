@@ -50,20 +50,22 @@ int dhsocket_client_start(dhsocket_t* this, const char* addr, unsigned int port)
 void dhsocket_send(int sfd, msg_codes code, void* buf, unsigned int size)
 {
     dhpacket_t *p = new(1,sizeof(dhpacket_t)+size);
+    if(!p)
+        return;
     p->code = code;
     memcpy(p->data, buf, size);
-    printf("Send: %zd\n",sizeof(dhpacket_t)+size);
     send(sfd, p, sizeof(dhpacket_t)+size, 0);
-    delete(p);
+    delete((void**)&p);
 }
 
 void dhsocket_recv(int sfd, void* buf, unsigned int size)
 {
     dhpacket_t *p = new(1,sizeof(dhpacket_t)+size);
-    int n = recv(sfd, p, sizeof(dhpacket_t)+size, 0);
-    printf("Receive: %d\n",n);
+    if(!p)
+        return;
+    recv(sfd, p, sizeof(dhpacket_t)+size, 0);
     memcpy(buf,p->data,size);
-    delete(p);
+    delete((void**)&p);
 }
 
 void dhsocket_close(dhsocket_t* this)

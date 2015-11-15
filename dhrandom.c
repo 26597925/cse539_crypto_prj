@@ -37,18 +37,20 @@ static void skip_lines(FILE* f, int n)
         getline(&line,&len,f);
     }
 
-    delete(line);
+    delete((void**)&line);
 }
 
 int generateParameters(mpz_t p, mpz_t g, unsigned int n)
 {
     FILE *fp = NULL;
+    int status = -1;
     
     int l = check_size(n,1);
 
     fp = fopen("./moduli","r");
 
-    if(fp == NULL) return -2;
+    if(!fp)
+        goto err;
 
     skip_lines(fp,l);
 
@@ -63,11 +65,14 @@ int generateParameters(mpz_t p, mpz_t g, unsigned int n)
        mpz_init_set_ui(g,_g);
     }
 
-    delete(line);
+    status = 0;
 
-    fclose(fp);
+err:
+    if(line) delete((void**)&line);
 
-    return 0;
+    if(fp) fclose(fp);
+
+    return status;
 }
 
 int generateRandomValue(mpz_t r, unsigned int len)
@@ -76,19 +81,23 @@ int generateRandomValue(mpz_t r, unsigned int len)
     unsigned int nb = len / 8;
     unsigned char bytes[nb];
     char* ret = NULL;
+    int status = -1;
 
     fd = open("/dev/urandom",O_RDONLY);
-    if(fd < 0) {
-        return -1;
-    }
-    if(read(fd,bytes,nb) != (int)nb) {
-        close(fd);
-        return -2;
-    }
+    if(fd < 0)
+        goto err;
+
+    if(read(fd,bytes,nb) != (int)nb)
+        goto err;
     
     ret = bytesToHexString((uint8_t*)bytes,nb);
     mpz_init_set_str(r,ret,16);
-    delete(ret);
-    close(fd);
-    return 0;
+    
+    status = 0;
+
+err:
+    if(fd) close(fd);
+    if(ret) delete((void**)&ret);
+    
+    return status;
 }

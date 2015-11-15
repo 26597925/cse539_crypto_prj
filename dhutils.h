@@ -6,7 +6,7 @@
 #include "hexString.h"
 
 void*           new(int,size_t);
-void            delete(void*);
+void            delete(void**);
 char*           hash(const char*);
 void            sign(const char*, unsigned char*, unsigned int*);
 int             verify(const char*, unsigned char*, unsigned int);

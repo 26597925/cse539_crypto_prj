@@ -7,8 +7,9 @@
 
 int dh_init(dhuser_t* this , int role)
 {
+    int status = -1;
     if(role > 1)
-        return -1;
+        goto err;
 
     this->role = role;
 
@@ -22,27 +23,32 @@ int dh_init(dhuser_t* this , int role)
     mpz_init(this->Shared_F);
     mpz_init(this->K);
 
-    return 0;
+    status = 0;
+err:
+    return status;
 }
 
 int dh_generateParameters(dhuser_t* this, unsigned int minP, 
         unsigned int aP, unsigned int maxP)
 {
+    int status = 0;
+
     this->min_mod_size = minP;
     this->mod_size = aP;
     this->max_mod_size = maxP;
 
     if(generateParameters(this->P,this->G,this->mod_size) < 0) {
-        dh_error("Error generating parameters",__FILE__,__LINE__,0);
-        return -1;
+        status = -1;
+        goto err;
     }
  
     if(verifySafePrime(this->P,25) == 0) {
-        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,0);
-        return -2;
+        status = -2;
+        goto err;
     }
 
-    return 0;
+err:
+    return status;
 }
 
 int dh_setParameters(dhuser_t* this, unsigned int minP,
@@ -57,7 +63,6 @@ int dh_setParameters(dhuser_t* this, unsigned int minP,
     mpz_set_str(this->G,gen,16);
     
     if(verifySafePrime(this->P,25) == 0) {
-        dh_error("Error verifying primality of modulus",__FILE__,__LINE__,0);
         return -1;
     }
     
@@ -70,21 +75,26 @@ int dh_generatePrivateKey(dhuser_t* this)
     static int prv_key_lens[] = {240,320,420,480,540,620};
     static int len = 6;
 
+    int status = 0;
+
     int v = -1;
     for(int i = 0; i < len; i++) {
         if(modsizes[i] == this->mod_size)
             v = i;
     }
 
-    if(v == -1)
-        return -1;
-
-    if(generateRandomValue(this->X,prv_key_lens[v]) < 0) {
-        dh_error("Error generating private key",__FILE__,__LINE__,0);
-        return -2;
+    if(v == -1) {
+        status = -1;
+        goto err;
     }
 
-    return 0;
+    if(generateRandomValue(this->X,prv_key_lens[v]) < 0) {
+        status = -2;
+        goto err;
+    }
+
+err:
+    return status;
 }
 
 void dh_generateSharedKey(dhuser_t* this)
@@ -118,6 +128,7 @@ char* dh_computePublicHash(dhuser_t* this)
     snprintf(min,5,"%u",this->min_mod_size);
     snprintf(ap,5,"%u",this->mod_size);
     snprintf(max,5,"%u",this->max_mod_size);
+    char* hval = NULL;
 
     char* p = mpz_get_str(NULL,10,this->P);
     char* g = mpz_get_str(NULL,10,this->G);
@@ -125,18 +136,25 @@ char* dh_computePublicHash(dhuser_t* this)
     char* e = mpz_get_str(NULL,10,this->Shared_E);
     char* k = mpz_get_str(NULL,10,this->K);
 
-    if(!p || !g || !e || !f || !k) {
-        dh_error("Incorrect value",__FILE__,__LINE__,0);
-        return NULL;
-    }
+    if(!p || !g || !e || !f || !k)
+        goto err;
 
     size_t concat_len = strlen(min)+strlen(ap)+strlen(max)+strlen(p)+
                         strlen(g)+strlen(e)+strlen(f)+strlen(k)+
                         strlen(this->server_id)+strlen(this->client_id);
     char concat[concat_len+1];
     snprintf(concat,sizeof(concat),"%s%s%s%s%s%s%s%s%s%s",this->client_id,this->server_id,min,ap,max,p,g,e,f,k);
-    delete(p);delete(g);delete(e);delete(f);delete(k);
-    return hash(concat);
+
+    hval = hash(concat);
+
+err:
+    if(p) delete((void**)&p);
+    if(g) delete((void**)&g);
+    if(e) delete((void**)&e);
+    if(f) delete((void**)&f);
+    if(k) delete((void**)&k);
+    
+    return hval;
 }
 
 void dh_destroy(dhuser_t* this)

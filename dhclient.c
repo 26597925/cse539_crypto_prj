@@ -75,10 +75,10 @@ int main(int argc, char* argv[])
 
     char* shared = mpz_get_str(NULL,16,bob.Shared_E);
     dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INIT, (unsigned char*)shared, strlen(shared));
-    delete(shared);
+    delete((void**)&shared);
     
     unsigned int bs = mpz_sizeinbase(bob.Shared_E, 16);
-    unsigned int hs = 128;
+    unsigned int hs = 256;
     unsigned char buf[hs+bs+1];
     dhsocket_recv(sock.sfd, buf, hs+bs);
     buf[hs+bs] = '\0';
@@ -90,8 +90,6 @@ int main(int argc, char* argv[])
     sscanf((char*)buf,typespec,hhsign,other);
 
     unsigned char* hsign = (unsigned char*)hexStringToBytes((char*)hhsign);
-   
-    printf("%s\n",hsign);
 
     mpz_t o;
     mpz_init_set_str(o,(char*)other,16);
@@ -103,7 +101,7 @@ int main(int argc, char* argv[])
     mpz_clear(o);
 
     char* hash = dh_computePublicHash(&bob);
-    if(verify(hash,hsign,hs) != 1) {
+    if(verify(hash,hsign,hs/2) != 1) {
         char sec_msg[] = "Fail";
         dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
         dh_error("Authentication Failed",__FILE__,__LINE__,0);
@@ -112,7 +110,7 @@ int main(int argc, char* argv[])
         dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
         printf("Secret sharing succeeded\n");
     }
-    delete(hash);
+    delete((void**)&hash);
 
     dh_destroy(&bob);
 
