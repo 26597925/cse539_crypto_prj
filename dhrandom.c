@@ -2,6 +2,7 @@
 #include "dhrandom.h"
 #include "dhutils.h"
 #include <stdio.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -85,7 +86,7 @@ int generateRandomValue(mpz_t r, unsigned int len)
         return -2;
     }
     
-    ret = bytesToHex(bytes,nb);
+    ret = bytesToHexString((uint8_t*)bytes,nb);
     mpz_init_set_str(r,ret,16);
     delete(ret);
     close(fd);

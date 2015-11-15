@@ -1,8 +1,12 @@
 #include "dhutils.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include <errno.h>
 #include <openssl/sha.h>
+#include <openssl/rsa.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
 
 typedef unsigned long int gmpuint;
 
@@ -27,28 +31,57 @@ void delete(void* v)
     v = NULL;
 }
 
-char* bytesToHex(unsigned char* bytes, size_t len)
-{
-    size_t i;
-    char* ret = new(len*2+1,sizeof(char));
-
-    for(i = 0; i < len; i++) 
-        sprintf(&ret[2*i],"%02X",bytes[i]);
-    ret[len*2] = '\0';
-
-    return ret;
-}
-
 char* hash(const char* msg)
 {
     unsigned char h[SHA_DIGEST_LENGTH];
-    /*SHA_CTX ctx;
-    SHA1_Init(&ctx);
-    SHA1_Update(&ctx,msg,strlen(msg));
-    SHA1_Final(h,&ctx);*/
     SHA1((unsigned char*)msg, strlen(msg), h);
-    return bytesToHex(h,sizeof(h));
+    return bytesToHexString(h,sizeof(h));
 }
+
+void sign(const char* msg, unsigned char* sig_buf, unsigned int* sig_len)
+{
+    EVP_MD_CTX md;
+    EVP_PKEY *pkey;
+    FILE* fp;
+
+    fp = fopen("private_key.pem","r");
+    if(!fp)
+        return;
+    pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+    fclose(fp);
+
+    if(!pkey) 
+        return;
+
+    EVP_SignInit(&md, EVP_sha1());
+    EVP_SignUpdate(&md, msg, strlen(msg));
+    if(EVP_SignFinal(&md, sig_buf, sig_len, pkey) != 1)
+        return;
+    
+    EVP_PKEY_free(pkey);
+}
+
+int verify(const char* msg, unsigned char* sig_buf, unsigned int sig_len)
+{
+    EVP_MD_CTX md;
+    EVP_PKEY *pkey;
+    FILE* fp;
+ 
+    fp = fopen("public_key.pem","r");
+    if(!fp)
+        return -1;
+    pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
+    fclose(fp);
+    
+    EVP_VerifyInit(&md, EVP_sha1());
+    EVP_VerifyUpdate(&md, msg, strlen((char*)msg));
+    if(EVP_VerifyFinal(&md, sig_buf, sig_len, pkey) != 1)
+        return 0;
+    EVP_PKEY_free(pkey);
+
+    return 1;
+}
+
 
 void fastExponent(mpz_t r, mpz_t a, mpz_t n ,mpz_t m)
 {

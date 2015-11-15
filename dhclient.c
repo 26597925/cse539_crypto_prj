@@ -1,6 +1,7 @@
 #include "dhutils.h"
 #include "dhuser.h"
 #include "dhsocket.h"
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,14 @@ int main(int argc, char* argv[])
         dh_error("Usage: dhclient <ip> <port> <min mod> <mod> <max mod>",__FILE__,__LINE__,1);
     }
 
+    dhsocket_t sock;
+    
+    if(dhsocket_init(&sock) == 0)
+        dh_error(NULL,__FILE__,__LINE__,1);
+
+    if(dhsocket_client_start(&sock,argv[1],atoi(argv[2])) == 0)
+        dh_error(NULL,__FILE__,__LINE__,1);
+    
     unsigned int minP = atoi(argv[3]);
     unsigned int iP = atoi(argv[4]);
     unsigned int maxP = atoi(argv[5]);
@@ -25,37 +34,22 @@ int main(int argc, char* argv[])
     unsigned char initBuf[3*sizeof(unsigned int) + 1];
 
     snprintf((char*)initBuf,sizeof(initBuf),"%u%u%u",minP,iP,maxP);
-
-    dhsocket_t sock;
     
-    if(dhsocket_init(&sock) == 0)
-        dh_error(NULL,__FILE__,__LINE__,1);
+    dhsocket_send(sock.sfd,MSG_KEY_DH_GEX_REQUEST,initBuf,strlen((char*)initBuf));
 
-    printf("Socket connected\n");
-
-    if(dhsocket_client_start(&sock,argv[1],atoi(argv[2])) == 0)
-        dh_error(NULL,__FILE__,__LINE__,1);
-
-    printf("Serv: %d\n",sock.sfd);
-
-    dhsocket_send(sock.sfd,initBuf,strlen((char*)initBuf));
-
-    char res[5];
-    dhsocket_recv(sock.sfd, (unsigned char*)res, sizeof(res)-1);
-    res[4] = '\0';
-
-    unsigned int  resP = atoi(res);
+    unsigned int resP;
+    dhsocket_recv(sock.sfd, &resP, sizeof(unsigned int));
+    resP = ntohs(resP);
     
     unsigned int mod_len = resP/8*2;
     unsigned int gen_size = 1;
     char modulus[mod_len+1];
     char generator[gen_size+1];
-    char mod_gen_buf[mod_len+gen_size+1];
-    dhsocket_recv(sock.sfd, (unsigned char*)mod_gen_buf,sizeof(mod_gen_buf)-1);
-    mod_gen_buf[mod_len+gen_size] = '\0';
+    unsigned char mod_gen_buf[mod_len+gen_size+1];
+    dhsocket_recv(sock.sfd,mod_gen_buf,sizeof(mod_gen_buf));
     char ts[count(mod_len)+count(gen_size)+5];
-    snprintf(ts,sizeof(ts),"%%%ds%%%ds",mod_len,gen_size);
-    sscanf(mod_gen_buf,ts,modulus,generator);
+    snprintf(ts,sizeof(ts),"%%%us%%%us",mod_len,gen_size);
+    sscanf((char*)mod_gen_buf,ts,modulus,generator);
 
     dhuser_t bob;
 
@@ -80,24 +74,27 @@ int main(int argc, char* argv[])
     dh_generateSharedKey(&bob);
 
     char* shared = mpz_get_str(NULL,16,bob.Shared_E);
-    dhsocket_send(sock.sfd, shared, strlen(shared));
+    dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INIT, (unsigned char*)shared, strlen(shared));
     delete(shared);
     
-    size_t bs = mpz_sizeinbase(bob.Shared_E, 16);
-    size_t hs = 40;
-    size_t bufsize = bs+hs;
-    unsigned char buf[bufsize+1];
-    dhsocket_recv(sock.sfd, buf, bufsize);
-    buf[bufsize] = '\0';
+    unsigned int bs = mpz_sizeinbase(bob.Shared_E, 16);
+    unsigned int hs = 128;
+    unsigned char buf[hs+bs+1];
+    dhsocket_recv(sock.sfd, buf, hs+bs);
+    buf[hs+bs] = '\0';
 
-    char other[bs+1];
-    char ohash[hs+1];
+    unsigned char other[bs+1];
+    unsigned char hhsign[hs+1];
     char typespec[count(bs)+count(hs)+5];
-    snprintf(typespec,sizeof(typespec),"%%%zds%%%zds",bs,hs);
-    sscanf((char*)buf,typespec,other,ohash);
-    
+    snprintf(typespec,sizeof(typespec),"%%%us%%%us",hs,bs);
+    sscanf((char*)buf,typespec,hhsign,other);
+
+    unsigned char* hsign = (unsigned char*)hexStringToBytes((char*)hhsign);
+   
+    printf("%s\n",hsign);
+
     mpz_t o;
-    mpz_init_set_str(o,other,16);
+    mpz_init_set_str(o,(char*)other,16);
     if(dh_computeSecret(&bob,o) < 0) {
         dh_destroy(&bob);
         dhsocket_close(&sock);
@@ -106,13 +103,13 @@ int main(int argc, char* argv[])
     mpz_clear(o);
 
     char* hash = dh_computePublicHash(&bob);
-    if(constantVerify(hash,ohash) == 0) {
+    if(verify(hash,hsign,hs) != 1) {
         char sec_msg[] = "Fail";
-        dhsocket_send(sock.sfd, (unsigned char*)sec_msg, strlen(sec_msg));
+        dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
         dh_error("Authentication Failed",__FILE__,__LINE__,0);
     } else {
         char sec_msg[] = "Succ";
-        dhsocket_send(sock.sfd, (unsigned char*)sec_msg, strlen(sec_msg));
+        dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
         printf("Secret sharing succeeded\n");
     }
     delete(hash);

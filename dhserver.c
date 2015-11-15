@@ -2,8 +2,10 @@
 #include "dhuser.h"
 #include "dhsocket.h"
 #include "dhrandom.h"
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <math.h>
@@ -42,9 +44,8 @@ int main(int argc, char* argv[])
     if(sock.cfd >= 0) 
         printf("Client connected on %d\n",sock.cfd);
 
-    unsigned char buf[3*sizeof(unsigned int)+1];
-    dhsocket_recv(sock.cfd, buf, sizeof(buf)-1);
-    buf[sizeof(buf)] = '\0';
+    unsigned char buf[3*sizeof(unsigned int)];
+    dhsocket_recv(sock.cfd, buf, sizeof(buf));
     unsigned char minP[sizeof(unsigned int) + 1];
     unsigned char iP[sizeof(unsigned int) + 1];
     unsigned char maxP[sizeof(unsigned int) + 1];
@@ -70,19 +71,18 @@ int main(int argc, char* argv[])
         dh_error("Error generating parameters",__FILE__,__LINE__,1);
     }
 
-    char res[5];
-    snprintf(res,sizeof(res),"%u",resP);
-    dhsocket_send(sock.cfd,res,strlen(res));
+    unsigned int tresP = htons(resP);
+    dhsocket_send(sock.cfd,MSG_KEX_DH_GEX_INTERIM,&tresP,sizeof(unsigned int));
     
     char *modulus  = mpz_get_str(NULL,16,alice.P);
     char *generator  = mpz_get_str(NULL,16,alice.G); 
     unsigned int mod_len = strlen(modulus);
     unsigned int gen_len = strlen(generator);
     unsigned int len_send = mod_len+gen_len;
-    
-    char pconcatg[len_send+1];
-    snprintf(pconcatg,sizeof(pconcatg),"%s%s",modulus,generator);
-    dhsocket_send(sock.cfd,(unsigned char*)pconcatg,strlen(pconcatg));
+ 
+    unsigned char pconcatg[len_send+1];
+    snprintf((char*)pconcatg,sizeof(pconcatg),"%s%s",modulus,generator);
+    dhsocket_send(sock.cfd,MSG_KEX_DH_GEX_GROUP,pconcatg,sizeof(pconcatg));
     delete(modulus);delete(generator);
     
     if(dh_generatePrivateKey(&alice) < 0) {
@@ -92,12 +92,12 @@ int main(int argc, char* argv[])
     }
 
     dh_generateSharedKey(&alice);
-    
+      
     unsigned int bs = mpz_sizeinbase(alice.Shared_F, 16);
     unsigned char other[bs+1];
     dhsocket_recv(sock.cfd,other,bs);
     other[bs] = '\0';
-    
+ 
     mpz_t o;
     mpz_init_set_str(o,(char*)other,16);
     if(dh_computeSecret(&alice,o) < 0) {
@@ -109,11 +109,23 @@ int main(int argc, char* argv[])
 
     char* shared = mpz_get_str(NULL,16,alice.Shared_F);
     char* hash = dh_computePublicHash(&alice);
-    char to_send[strlen(shared)+strlen(hash) + 1];
-    snprintf(to_send,sizeof(to_send),"%s%s",shared,hash);
-    dhsocket_send(sock.cfd, to_send, strlen(to_send));
-    delete(shared);delete(hash);
+    unsigned char* hsign = calloc(4096, sizeof(unsigned char));
+    unsigned int hsign_len = sizeof(hsign);
+    sign(hash,hsign,&hsign_len);
+    if(hsign == NULL) {
+        dh_destroy(&alice);
+        dhsocket_close(&sock);
+        dh_error("Error signing hash",__FILE__,__LINE__,1);
+    }
+    unsigned char* hhsign = (unsigned char*)bytesToHexString((uint8_t*)hsign, hsign_len);
+    
+    printf("%s\n",hsign);
  
+    unsigned char to_send[strlen(shared)+strlen((char*)hhsign)+1];
+    snprintf((char*)to_send,sizeof(to_send),"%s%s",hhsign,shared);
+    dhsocket_send(sock.cfd, MSG_KEX_DH_GEX_REPLY, to_send, sizeof(to_send) - 1);
+    delete(shared);delete(hash);delete(hsign);delete(hhsign);
+     
     char final_rec[5];
     dhsocket_recv(sock.cfd, (unsigned char*)final_rec, sizeof(final_rec) - 1);
     final_rec[4] = '\0';

@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "dhsocket.h"
+#include "dhutils.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -46,14 +47,23 @@ int dhsocket_client_start(dhsocket_t* this, const char* addr, unsigned int port)
     return connect(this->sfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) >= 0;
 }
 
-void dhsocket_send(int sfd, void* buf, unsigned int size)
+void dhsocket_send(int sfd, msg_codes code, void* buf, unsigned int size)
 {
-    send(sfd, buf, size, 0);
+    dhpacket_t *p = new(1,sizeof(dhpacket_t)+size);
+    p->code = code;
+    memcpy(p->data, buf, size);
+    printf("Send: %zd\n",sizeof(dhpacket_t)+size);
+    send(sfd, p, sizeof(dhpacket_t)+size, 0);
+    delete(p);
 }
 
-void dhsocket_recv(int sfd, unsigned char* buf, unsigned int size)
+void dhsocket_recv(int sfd, void* buf, unsigned int size)
 {
-    recv(sfd, buf, size, 0);
+    dhpacket_t *p = new(1,sizeof(dhpacket_t)+size);
+    int n = recv(sfd, p, sizeof(dhpacket_t)+size, 0);
+    printf("Receive: %d\n",n);
+    memcpy(buf,p->data,size);
+    delete(p);
 }
 
 void dhsocket_close(dhsocket_t* this)
