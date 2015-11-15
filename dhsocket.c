@@ -11,7 +11,8 @@
 int dhsocket_init(dhsocket_t* this)
 {
     this->cfd = 0;
-    return (this->sfd = socket(AF_INET, SOCK_STREAM, 0)) >= 0;
+    this->sfd = socket(AF_INET, SOCK_STREAM, 0);
+    return (this->sfd < 0);
 }
 
 int dhsocket_serv_start(dhsocket_t* this, unsigned int port)

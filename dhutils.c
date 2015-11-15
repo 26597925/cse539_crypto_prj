@@ -10,14 +10,6 @@
 
 typedef unsigned long int gmpuint;
 
-void dh_error(const char* msg, const char* file, int line, int e)
-{
-    //fprintf(stderr,"In %s:%d\n",file,line);
-    //perror(msg);
-    fputs("ERROR", stderr);
-    if(e) exit(EXIT_FAILURE);
-}
-
 void* new(int num, size_t size)
 {
     void* v = calloc(num,size);

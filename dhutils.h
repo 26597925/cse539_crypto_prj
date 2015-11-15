@@ -13,6 +13,5 @@ int             verify(const char*, unsigned char*, unsigned int);
 void            fastExponent(mpz_t,mpz_t,mpz_t,mpz_t);
 int             constantVerify(const char*, const char*);
 int             verifySafePrime(mpz_t,int);
-void            dh_error(const char*,const char*,int,int);
 
 #endif

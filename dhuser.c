@@ -31,21 +31,19 @@ err:
 int dh_generateParameters(dhuser_t* this, unsigned int minP, 
         unsigned int aP, unsigned int maxP)
 {
-    int status = 0;
+    int status = -1;
 
     this->min_mod_size = minP;
     this->mod_size = aP;
     this->max_mod_size = maxP;
 
-    if(generateParameters(this->P,this->G,this->mod_size) < 0) {
-        status = -1;
+    if(generateParameters(this->P,this->G,this->mod_size) < 0)
         goto err;
-    }
  
-    if(verifySafePrime(this->P,25) == 0) {
-        status = -2;
+    if(verifySafePrime(this->P,25) == 0) 
         goto err;
-    }
+
+    status = 0;
 
 err:
     return status;
@@ -75,7 +73,7 @@ int dh_generatePrivateKey(dhuser_t* this)
     static int prv_key_lens[] = {240,320,420,480,540,620};
     static int len = 6;
 
-    int status = 0;
+    int status = -1;
 
     int v = -1;
     for(int i = 0; i < len; i++) {
@@ -83,15 +81,13 @@ int dh_generatePrivateKey(dhuser_t* this)
             v = i;
     }
 
-    if(v == -1) {
-        status = -1;
+    if(v == -1) 
         goto err;
-    }
 
-    if(generateRandomValue(this->X,prv_key_lens[v]) < 0) {
-        status = -2;
+    if(generateRandomValue(this->X,prv_key_lens[v]) < 0)
         goto err;
-    }
+
+    status = 0;
 
 err:
     return status;
@@ -139,13 +135,15 @@ char* dh_computePublicHash(dhuser_t* this)
     if(!p || !g || !e || !f || !k)
         goto err;
 
-    size_t concat_len = strlen(min)+strlen(ap)+strlen(max)+strlen(p)+
-                        strlen(g)+strlen(e)+strlen(f)+strlen(k)+
-                        strlen(this->server_id)+strlen(this->client_id);
-    char concat[concat_len+1];
-    snprintf(concat,sizeof(concat),"%s%s%s%s%s%s%s%s%s%s",this->client_id,this->server_id,min,ap,max,p,g,e,f,k);
+    {
+        size_t concat_len = strlen(min)+strlen(ap)+strlen(max)+strlen(p)+
+                            strlen(g)+strlen(e)+strlen(f)+strlen(k)+
+                            strlen(this->server_id)+strlen(this->client_id);
+        char concat[concat_len+1];
+        snprintf(concat,sizeof(concat),"%s%s%s%s%s%s%s%s%s%s",this->client_id,this->server_id,min,ap,max,p,g,e,f,k);
 
-    hval = hash(concat);
+        hval = hash(concat);
+    }
 
 err:
     if(p) delete((void**)&p);
