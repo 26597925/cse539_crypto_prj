@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <openssl/rand.h>
 
 int check_size(unsigned int b, int type)
 {
@@ -77,7 +78,7 @@ err:
 
 int generateRandomValue(mpz_t r, unsigned int len)
 {
-    int fd = 0;
+    /*int fd = 0;
     unsigned int nb = len / 8;
     unsigned char bytes[nb];
     char* ret = NULL;
@@ -97,6 +98,27 @@ int generateRandomValue(mpz_t r, unsigned int len)
 
 err:
     if(fd) close(fd);
+    if(ret) delete((void**)&ret);
+    
+    return status;*/
+    
+    int status = -1;
+    unsigned int nb = len / 8;
+    unsigned char bytes[nb];
+    char* ret = NULL;
+
+    int rc = RAND_load_file("/dev/urandom",32);
+    if(rc != 32) 
+        goto err;
+    int n = RAND_bytes(bytes,nb);
+    if(n != 1)
+        goto err;
+
+    ret = bytesToHexString((uint8_t*)bytes,nb);
+    mpz_init_set_str(r,ret,16);
+    
+    status = 0;
+err:
     if(ret) delete((void**)&ret);
     
     return status;

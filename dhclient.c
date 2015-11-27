@@ -20,6 +20,10 @@ int main(int argc, char* argv[])
     dhuser_t bob;
     
     dhsocket_t sock;
+    
+    unsigned char* hsign = NULL;
+    char* hash = NULL;
+
 
     int cc = dh_init(&bob, CLIENT);
     
@@ -71,9 +75,6 @@ int main(int argc, char* argv[])
     char* shared = mpz_get_str(NULL,16,bob.Shared_E);
     dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INIT, (unsigned char*)shared, strlen(shared));
     delete((void**)&shared);
-
-    unsigned char* hsign = NULL;
-    char* hash = NULL;
 
     {
         unsigned int bs = mpz_sizeinbase(bob.Shared_E, 16);
