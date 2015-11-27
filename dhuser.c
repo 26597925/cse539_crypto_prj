@@ -70,7 +70,7 @@ int dh_setParameters(dhuser_t* this, unsigned int minP,
 int dh_generatePrivateKey(dhuser_t* this)
 {
     static int modsizes[] = {1536,2048,3072,4096,6144,8192};
-    static int prv_key_lens[] = {240,320,420,480,540,620};
+    static int prv_key_lens[] = {120,160,210,240,270,310};
     static int len = 6;
 
     int status = -1;
