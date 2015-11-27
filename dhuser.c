@@ -13,8 +13,8 @@ int dh_init(dhuser_t* this , int role)
 
     this->role = role;
 
-    this->server_id = "Alice";
-    this->client_id = "Bob";
+    this->server_id = "SSH-2.0-1.0 Server \r \n";
+    this->client_id = "SSH-2.0-1.0 Client \r \n";
 
     mpz_init(this->P);
     mpz_init(this->G);
