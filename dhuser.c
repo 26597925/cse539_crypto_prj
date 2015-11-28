@@ -33,6 +33,9 @@ int dh_generateParameters(dhuser_t* this, unsigned int minP,
 {
     int status = -1;
 
+    if(!this)
+        goto err;
+
     this->min_mod_size = minP;
     this->mod_size = aP;
     this->max_mod_size = maxP;
@@ -51,14 +54,14 @@ err:
 
 int dh_setParameters(dhuser_t* this, unsigned int minP,
         unsigned int aP, unsigned int maxP,
-        const char* mod, const char* gen)
+        mpz_t mod, mpz_t gen)
 {
     this->min_mod_size = minP;
     this->mod_size = aP;
     this->max_mod_size = maxP;
     
-    mpz_set_str(this->P,mod,16);
-    mpz_set_str(this->G,gen,16);
+    mpz_set(this->P,mod);
+    mpz_set(this->G,gen);
     
     if(verifySafePrime(this->P,25) == 0) {
         return -1;
@@ -69,8 +72,8 @@ int dh_setParameters(dhuser_t* this, unsigned int minP,
 
 int dh_generatePrivateKey(dhuser_t* this)
 {
-    static int modsizes[] = {1536,2048,3072,4096,6144,8192};
-    static int prv_key_lens[] = {120,160,210,240,270,310};
+    static int modsizes[] = {1024,1536,2048,3072,4096,6144,8192};
+    static int prv_key_lens[] = {80,120,160,210,240,270,310};
     static int len = 6;
 
     int status = -1;
@@ -140,17 +143,22 @@ char* dh_computePublicHash(dhuser_t* this)
                             strlen(g)+strlen(e)+strlen(f)+strlen(k)+
                             strlen(this->server_id)+strlen(this->client_id);
         char concat[concat_len+1];
+        /*
+         * We always use snprintf to elimiate potential buffer overflow in compliance with
+         * https://www.securecoding.cert.org/confluence/display/c/EXP33-C.+Do+not+read+uninitialized+memory
+         * https://www.securecoding.cert.org/confluence/display/c/STR31-C.+Guarantee+that+storage+for+strings+has+sufficient+space+for+character+data+and+the+null+terminator
+         */
         snprintf(concat,sizeof(concat),"%s%s%s%s%s%s%s%s%s%s",this->client_id,this->server_id,min,ap,max,p,g,e,f,k);
 
         hval = hash(concat);
     }
 
 err:
-    if(p) delete((void**)&p);
-    if(g) delete((void**)&g);
-    if(e) delete((void**)&e);
-    if(f) delete((void**)&f);
-    if(k) delete((void**)&k);
+    if(p) delete(p,strlen(p));
+    if(g) delete(g,strlen(g));
+    if(e) delete(e,strlen(e));
+    if(f) delete(f,strlen(f));
+    if(k) delete(k,strlen(k));
     
     return hval;
 }

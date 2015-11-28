@@ -28,8 +28,12 @@ int main(int argc, char* argv[])
     int status = -1;
     
     dhsocket_t sock;
+
+    s_memclr(&sock, sizeof(dhsocket_t));
     
     dhuser_t alice;
+
+    s_memclr(&alice, sizeof(dhuser_t));
 
     int cc = dh_init(&alice, SERVER);
     
@@ -59,6 +63,10 @@ int main(int argc, char* argv[])
     if(dh_generateParameters(&alice, uminP, resP, umaxP) < 0)
         goto err;
 
+    /*
+     * Converting to network byte order in accordance with
+     * https://www.securecoding.cert.org/confluence/display/c/POS39-C.+Use+the+correct+byte+ordering+when+transferring+data+between+systems
+     */
     unsigned int tresP = htons(resP);
     dhsocket_send(sock.cfd,MSG_KEX_DH_GEX_INTERIM,&tresP,sizeof(unsigned int));
     
@@ -72,6 +80,11 @@ int main(int argc, char* argv[])
         unsigned int len_send = mod_len+gen_len;
 
         unsigned char pconcatg[len_send+1];
+        /*
+         * We always use snprintf to elimiate potential buffer overflow in compliance with
+         * https://www.securecoding.cert.org/confluence/display/c/EXP33-C.+Do+not+read+uninitialized+memory
+         * https://www.securecoding.cert.org/confluence/display/c/STR31-C.+Guarantee+that+storage+for+strings+has+sufficient+space+for+character+data+and+the+null+terminator
+         */
         snprintf((char*)pconcatg,sizeof(pconcatg),"%s%s",modulus,generator);
         dhsocket_send(sock.cfd,MSG_KEX_DH_GEX_GROUP,pconcatg,len_send+1);
     }
@@ -99,11 +112,10 @@ int main(int argc, char* argv[])
     char* hash = dh_computePublicHash(&alice);
     if(!shared || !hash) 
         goto err;
-    unsigned char* hsign = calloc(4096, sizeof(unsigned char));
+    unsigned char hsign[4096];
+    s_memclr(hsign, 4096);
     unsigned int hsign_len = sizeof(hsign);
     sign(hash,hsign,&hsign_len);
-    if(!hsign) 
-        goto err;
     unsigned char* hhsign = (unsigned char*)bytesToHexString((uint8_t*)hsign, hsign_len);    
     if(!hhsign) 
         goto err;
@@ -114,31 +126,31 @@ int main(int argc, char* argv[])
         dhsocket_send(sock.cfd, MSG_KEX_DH_GEX_REPLY, to_send, sizeof(to_send) - 1);
     }
  
-    char final_rec[5];
-    dhsocket_recv(sock.cfd, (unsigned char*)final_rec, sizeof(final_rec) - 1);
+    unsigned char final_rec[5];
+    dhsocket_recv(sock.cfd, final_rec, sizeof(final_rec) - 1);
     final_rec[4] = '\0';
 
-    if(constantVerify(final_rec, "Fail") == 1) {
-        status = -13;
+    if(constantVerify(final_rec, (unsigned char*)"Fail") == 1) {
         goto err;
-    } else if(constantVerify(final_rec, "Succ") == 1) {
+    } else if(constantVerify(final_rec, (unsigned char*)"Succ") == 1) {
         printf("Secret sharing succeeded\n");
     } else {
-        status = -14;
         goto err;
     }
     
     status = 0;
+
 err:
-    if(modulus) delete((void**)&modulus);
-    if(generator) delete((void**)&generator);
-    if(shared) delete((void**)&shared);
-    if(hash) delete((void**)&hash);
-    if(hsign) delete((void**)&hsign);
-    if(hhsign) delete((void**)&hhsign);
+    if(modulus) delete(modulus,strlen(modulus));
+    if(generator) delete(generator,strlen(generator));
+    if(shared) delete(shared,strlen(shared));
+    if(hash) delete(hash,strlen(hash));
+    if(hhsign) delete(hhsign,strlen((char*)hhsign));
     
     dh_destroy(&alice);
     dhsocket_close(&sock);
 
     return status;
+
+
 }

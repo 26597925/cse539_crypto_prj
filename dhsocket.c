@@ -56,7 +56,7 @@ void dhsocket_send(int sfd, msg_codes code, void* buf, unsigned int size)
     p->code = code;
     memcpy(p->data, buf, size);
     send(sfd, p, sizeof(dhpacket_t)+size, 0);
-    delete((void**)&p);
+    delete(p, sizeof(dhpacket_t)+size);
 }
 
 void dhsocket_recv(int sfd, void* buf, unsigned int size)
@@ -66,7 +66,7 @@ void dhsocket_recv(int sfd, void* buf, unsigned int size)
         return;
     recv(sfd, p, sizeof(dhpacket_t)+size, 0);
     memcpy(buf,p->data,size);
-    delete((void**)&p);
+    delete(p, sizeof(dhpacket_t)+size);
 }
 
 void dhsocket_close(dhsocket_t* this)

@@ -1,3 +1,7 @@
+/*
+ * No leading or trailing underscores in header guards in compliance with
+ * https://www.securecoding.cert.org/confluence/display/c/DCL37-C.+Do+not+declare+or+define+a+reserved+identifier
+ */
 #ifndef DH_SOCKET_H
 #define DH_SOCKET_H
 

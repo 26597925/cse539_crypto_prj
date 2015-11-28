@@ -42,6 +42,10 @@ int main(int argc, char* argv[])
     {
         unsigned char initBuf[13];
 
+        /*
+         * We always use snprintf to elimiate potential buffer overflow in compliance with
+         * https://www.securecoding.cert.org/confluence/display/c/EXP33-C.+Do+not+read+uninitialized+memory
+         */
         snprintf((char*)initBuf,sizeof(initBuf),"%u%u%u",minP,iP,maxP);
         
         dhsocket_send(sock.sfd,MSG_KEY_DH_GEX_REQUEST,initBuf,sizeof(initBuf)-1);
@@ -49,6 +53,10 @@ int main(int argc, char* argv[])
 
     unsigned int resP;
     dhsocket_recv(sock.sfd, &resP, sizeof(unsigned int));
+    /*
+     * Converting to host byte order in accordance with
+     * https://www.securecoding.cert.org/confluence/display/c/POS39-C.+Use+the+correct+byte+ordering+when+transferring+data+between+systems
+     */
     resP = ntohs(resP);
     
     {
@@ -62,8 +70,13 @@ int main(int argc, char* argv[])
         snprintf(ts,sizeof(ts),"%%%us%%%us",mod_len,gen_size);
         sscanf((char*)mod_gen_buf,ts,modulus,generator);
 
-
-        if(dh_setParameters(&bob, minP, resP, maxP, modulus, generator) < 0) 
+        mpz_t mod, gen;
+        mpz_init_set_str(mod,modulus,16);
+        mpz_init_set_str(gen,generator,16);
+        int r = dh_setParameters(&bob, minP, resP, maxP, mod, gen);
+        mpz_clear(mod);
+        mpz_clear(gen);
+        if(r < 0)
             goto err;
     }
 
@@ -74,7 +87,6 @@ int main(int argc, char* argv[])
 
     char* shared = mpz_get_str(NULL,16,bob.Shared_E);
     dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INIT, (unsigned char*)shared, strlen(shared));
-    delete((void**)&shared);
 
     {
         unsigned int bs = mpz_sizeinbase(bob.Shared_E, 16);
@@ -100,10 +112,20 @@ int main(int argc, char* argv[])
 
         hash = dh_computePublicHash(&bob);
         if(verify(hash,hsign,hs/2) != 1) {
+            /*
+             * This is a properly constructed string with a null char
+             * so we call strlen.
+             * https://www.securecoding.cert.org/confluence/display/c/STR32-C.+Do+not+pass+a+non-null-terminated+character+sequence+to+a+library+function+that+expects+a+string
+             */
             char sec_msg[] = "Fail";
             dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
             goto err;
         } else {
+            /*
+             * This is a properly constructed string with a null char
+             * so we call strlen. 
+             * https://www.securecoding.cert.org/confluence/display/c/STR32-C.+Do+not+pass+a+non-null-terminated+character+sequence+to+a+library+function+that+expects+a+string
+             */
             char sec_msg[] = "Succ";
             dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
             printf("Secret sharing succeeded\n");
@@ -114,8 +136,14 @@ int main(int argc, char* argv[])
 
 err:
 
-    if(hsign) delete((void**)&hsign);
-    if(hash) delete((void**)&hash);
+    if(shared) delete(shared,strlen(shared));
+    /*
+     * hsign is not null terminated so we do not call strlen instead we pass a constant buffer size computed
+     * earlier in accordance with:
+     * https://www.securecoding.cert.org/confluence/display/c/STR32-C.+Do+not+pass+a+non-null-terminated+character+sequence+to+a+library+function+that+expects+a+string
+     */
+    if(hsign) delete(hsign,128);
+    if(hash) delete(hash,strlen(hash));
 
     dh_destroy(&bob);
     dhsocket_close(&sock);
