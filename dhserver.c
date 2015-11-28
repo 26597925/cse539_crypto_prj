@@ -47,11 +47,11 @@ int main(int argc, char* argv[])
 
     dhsocket_serv_accept(&sock);
 
-    unsigned char minnmax_buf[12];
+    byte minnmax_buf[12];
     dhsocket_recv(sock.cfd, minnmax_buf, 12);
-    unsigned char minP[5];
-    unsigned char iP[5];
-    unsigned char maxP[5];
+    byte minP[5];
+    byte iP[5];
+    byte maxP[5];
     sscanf((char*)minnmax_buf,"%4s%4s%4s",minP,iP,maxP);
 
     unsigned int uminP = atoi((char*)minP);
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
         unsigned int gen_len = strlen(generator);
         unsigned int len_send = mod_len+gen_len;
 
-        unsigned char pconcatg[len_send+1];
+        byte pconcatg[len_send+1];
         /*
          * We always use snprintf to elimiate potential buffer overflow in compliance with
          * https://www.securecoding.cert.org/confluence/display/c/EXP33-C.+Do+not+read+uninitialized+memory
@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
  
     {
         unsigned int bs = mpz_sizeinbase(alice.Shared_F, 16);
-        unsigned char other[bs+1];
+        byte other[bs+1];
         dhsocket_recv(sock.cfd,other,bs);
         other[bs] = '\0';
  
@@ -112,27 +112,27 @@ int main(int argc, char* argv[])
     char* hash = dh_computePublicHash(&alice);
     if(!shared || !hash) 
         goto err;
-    unsigned char hsign[4096];
+    byte hsign[4096];
     s_memclr(hsign, 4096);
     unsigned int hsign_len = sizeof(hsign);
     sign(hash,hsign,&hsign_len);
-    unsigned char* hhsign = (unsigned char*)bytesToHexString((uint8_t*)hsign, hsign_len);    
+    byte* hhsign = (byte*)bytesToHexString((uint8_t*)hsign, hsign_len);    
     if(!hhsign) 
         goto err;
 
     {
-        unsigned char to_send[strlen(shared)+strlen((char*)hhsign)+1];
+        byte to_send[strlen(shared)+strlen((char*)hhsign)+1];
         snprintf((char*)to_send,sizeof(to_send),"%s%s",hhsign,shared);
         dhsocket_send(sock.cfd, MSG_KEX_DH_GEX_REPLY, to_send, sizeof(to_send) - 1);
     }
  
-    unsigned char final_rec[5];
+    byte final_rec[5];
     dhsocket_recv(sock.cfd, final_rec, sizeof(final_rec) - 1);
     final_rec[4] = '\0';
 
-    if(constantVerify(final_rec, (unsigned char*)"Fail") == 1) {
+    if(constantVerify(final_rec, (byte*)"Fail") == 1) {
         goto err;
-    } else if(constantVerify(final_rec, (unsigned char*)"Succ") == 1) {
+    } else if(constantVerify(final_rec, (byte*)"Succ") == 1) {
         printf("Secret sharing succeeded\n");
     } else {
         goto err;

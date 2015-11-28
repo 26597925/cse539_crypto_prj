@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
     
     dhsocket_t sock;
     
-    unsigned char* hsign = NULL;
+    byte* hsign = NULL;
     char* hash = NULL;
 
 
@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
     unsigned int maxP = atoi(argv[5]);
 
     {
-        unsigned char initBuf[13];
+        byte initBuf[13];
 
         /*
          * We always use snprintf to elimiate potential buffer overflow in compliance with
@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
         unsigned int gen_size = 1;
         char modulus[mod_len+1];
         char generator[gen_size+1];
-        unsigned char mod_gen_buf[mod_len+gen_size+1];
+        byte mod_gen_buf[mod_len+gen_size+1];
         dhsocket_recv(sock.sfd,mod_gen_buf,sizeof(mod_gen_buf));
         char ts[count(mod_len)+count(gen_size)+5];
         snprintf(ts,sizeof(ts),"%%%us%%%us",mod_len,gen_size);
@@ -86,22 +86,22 @@ int main(int argc, char* argv[])
     dh_generateSharedKey(&bob);
 
     char* shared = mpz_get_str(NULL,16,bob.Shared_E);
-    dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INIT, (unsigned char*)shared, strlen(shared));
+    dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INIT, (byte*)shared, strlen(shared));
 
     {
         unsigned int bs = mpz_sizeinbase(bob.Shared_E, 16);
         unsigned int hs = 256;
-        unsigned char buf[hs+bs+1];
+        byte buf[hs+bs+1];
         dhsocket_recv(sock.sfd, buf, hs+bs);
         buf[hs+bs] = '\0';
 
-        unsigned char other[bs+1];
-        unsigned char hhsign[hs+1];
+        byte other[bs+1];
+        byte hhsign[hs+1];
         char typespec[count(bs)+count(hs)+5];
         snprintf(typespec,sizeof(typespec),"%%%us%%%us",hs,bs);
         sscanf((char*)buf,typespec,hhsign,other);
 
-        hsign = (unsigned char*)hexStringToBytes((char*)hhsign);
+        hsign = (byte*)hexStringToBytes((char*)hhsign);
 
         mpz_t o;
         mpz_init_set_str(o,(char*)other,16);
@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
              * https://www.securecoding.cert.org/confluence/display/c/STR32-C.+Do+not+pass+a+non-null-terminated+character+sequence+to+a+library+function+that+expects+a+string
              */
             char sec_msg[] = "Fail";
-            dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
+            dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (byte*)sec_msg, strlen(sec_msg));
             goto err;
         } else {
             /*
@@ -127,7 +127,7 @@ int main(int argc, char* argv[])
              * https://www.securecoding.cert.org/confluence/display/c/STR32-C.+Do+not+pass+a+non-null-terminated+character+sequence+to+a+library+function+that+expects+a+string
              */
             char sec_msg[] = "Succ";
-            dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (unsigned char*)sec_msg, strlen(sec_msg));
+            dhsocket_send(sock.sfd, MSG_KEX_DH_GEX_INTERIM, (byte*)sec_msg, strlen(sec_msg));
             printf("Secret sharing succeeded\n");
         }
     }

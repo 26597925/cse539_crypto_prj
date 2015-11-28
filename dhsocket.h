@@ -5,6 +5,8 @@
 #ifndef DH_SOCKET_H
 #define DH_SOCKET_H
 
+#include "dhutils.h"
+
 struct dhsocket {
     int sfd;
     int cfd;
@@ -21,7 +23,7 @@ typedef enum {
 
 struct dhpacket {
     msg_codes code;
-    unsigned char data[];
+    byte data[];
 };
 typedef struct dhpacket dhpacket_t;
 

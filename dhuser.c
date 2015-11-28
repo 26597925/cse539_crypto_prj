@@ -171,4 +171,6 @@ void dh_destroy(dhuser_t* this)
     mpz_clear(this->Shared_E);
     mpz_clear(this->Shared_F);
     mpz_clear(this->K);
+    this->server_id = NULL;
+    this->client_id = NULL;
 }

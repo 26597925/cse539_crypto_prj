@@ -55,9 +55,9 @@ inline void s_memclr(void* v, size_t n)
 
 char* hash(const char* msg)
 {
-    unsigned char h[SHA_DIGEST_LENGTH];
+    byte h[SHA_DIGEST_LENGTH];
     s_memclr(h, SHA_DIGEST_LENGTH);
-    SHA1((unsigned char*)msg, strlen(msg), h);
+    SHA1((byte*)msg, strlen(msg), h);
     return bytesToHexString(h,sizeof(h));
 }
 
@@ -67,7 +67,7 @@ char* hash(const char* msg)
  * https://github.com/luvit/openssl/blob/master/openssl/demos/sign/sign.c
  *
  */
-void sign(const char* msg, unsigned char* sig_buf, unsigned int* sig_len)
+void sign(const char* msg, byte* sig_buf, unsigned int* sig_len)
 {
     EVP_MD_CTX md;
     EVP_PKEY *pkey = NULL;
@@ -123,7 +123,7 @@ err:
  * https://github.com/luvit/openssl/blob/master/openssl/demos/sign/sign.c
  *
  */
-int verify(const char* msg, unsigned char* sig_buf, unsigned int sig_len)
+int verify(const char* msg, byte* sig_buf, unsigned int sig_len)
 {
     EVP_MD_CTX md;
     EVP_PKEY *pkey = NULL;
@@ -209,11 +209,11 @@ void fastExponent(mpz_t r, mpz_t a, mpz_t n ,mpz_t m)
 
 /*
  *
- * Constant-time buffer compare. Buffers are treated as unsigned char* as per:
+ * Constant-time buffer compare. Buffers are treated as byte* as per:
  * https://cryptocoding.net/index.php/Coding_rules#Use_unsigned_bytes_to_represent_binary_data
  *
  */
-int constantVerify(const unsigned char* a, const unsigned char* b)
+int constantVerify(const byte* a, const byte* b)
 {
     size_t la = strlen((char*)a);
     size_t lb = strlen((char*)b);

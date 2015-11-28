@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
     char* alice_hash = dh_computePublicHash(&alice);
     char* bob_hash = dh_computePublicHash(&bob);
     
-    unsigned char sig_buf[4096];
+    byte sig_buf[4096];
     s_memclr(sig_buf, 4096);
     unsigned int sig_len = sizeof(sig_buf);
     sign(alice_hash, sig_buf, &sig_len);

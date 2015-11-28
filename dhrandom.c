@@ -118,7 +118,7 @@ int generateRandomValue(mpz_t r, unsigned int len)
 {
     int status = -1;
     unsigned int nb = len / 8;
-    unsigned char bytes[nb];
+    byte bytes[nb];
     char* ret = NULL;
     /*
      * In compliance with:
