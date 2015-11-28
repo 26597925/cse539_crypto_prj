@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
 
     {
         unsigned int bs = mpz_sizeinbase(bob.Shared_E, 16);
-        unsigned int hs = 256;
+        unsigned int hs = 512;
         byte buf[hs+bs+1];
         dhsocket_recv(sock.sfd, buf, hs+bs);
         buf[hs+bs] = '\0';
@@ -142,7 +142,7 @@ err:
      * earlier in accordance with:
      * https://www.securecoding.cert.org/confluence/display/c/STR32-C.+Do+not+pass+a+non-null-terminated+character+sequence+to+a+library+function+that+expects+a+string
      */
-    if(hsign) delete(hsign,128);
+    if(hsign) delete(hsign,256);
     if(hash) delete(hash,strlen(hash));
 
     dh_destroy(&bob);

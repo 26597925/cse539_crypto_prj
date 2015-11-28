@@ -44,10 +44,11 @@ int main(int argc, char *argv[])
     if(!alice_hash || !bob_hash)
         goto err;
     
-    byte sig_buf[4096];
-    s_memclr(sig_buf, 4096);
+    byte sig_buf[2048];
+    s_memclr(sig_buf, 2048);
     unsigned int sig_len = sizeof(sig_buf);
     sign(alice_hash, sig_buf, &sig_len);
+    printf("%u\n",sig_len);
     if(verify(bob_hash, sig_buf, sig_len) != 1)
         printf("Authentication failed\n");
     else

@@ -112,8 +112,8 @@ int main(int argc, char* argv[])
     char* hash = dh_computePublicHash(&alice);
     if(!shared || !hash) 
         goto err;
-    byte hsign[4096];
-    s_memclr(hsign, 4096);
+    byte hsign[2048];
+    s_memclr(hsign, 2048);
     unsigned int hsign_len = sizeof(hsign);
     sign(hash,hsign,&hsign_len);
     byte* hhsign = (byte*)bytesToHexString((uint8_t*)hsign, hsign_len);    
