@@ -41,6 +41,9 @@ int main(int argc, char *argv[])
     char* alice_hash = dh_computePublicHash(&alice);
     char* bob_hash = dh_computePublicHash(&bob);
     
+    if(!alice_hash || !bob_hash)
+        goto err;
+    
     byte sig_buf[4096];
     s_memclr(sig_buf, 4096);
     unsigned int sig_len = sizeof(sig_buf);
@@ -52,6 +55,9 @@ int main(int argc, char *argv[])
 
     status = 0;
 err:
+    
+    if(alice_hash) delete(alice_hash, strlen(alice_hash));
+    if(bob_hash) delete(bob_hash, strlen(bob_hash));
 
     dh_destroy(&alice);
     dh_destroy(&bob);

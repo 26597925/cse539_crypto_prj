@@ -53,6 +53,9 @@ inline void s_memclr(void* v, size_t n)
     memset_volatile(v, 0, n);
 }
 
+/*
+* SHA1 hash using openssl primitives
+*/
 char* hash(const char* msg)
 {
     byte h[SHA_DIGEST_LENGTH];
